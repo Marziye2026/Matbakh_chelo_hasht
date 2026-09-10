@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>مطبخ چلو هشت | سفارش غذای سازمانی</title>
+<style>
+:root{--ink:#19221d;--muted:#718078;--paper:#f7f5ef;--card:#fff;--accent:#7a4b2a;--gold:#c8a35d;--line:#e7e1d6;--ok:#2f7751}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:Tahoma,Arial,sans-serif}
+button,input,select{font:inherit}button{cursor:pointer}.shell{max-width:1180px;margin:auto;padding:24px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}.brand{display:flex;gap:14px;align-items:center}.mark{width:48px;height:48px;border-radius:15px;background:var(--accent);color:white;display:grid;place-items:center;font-size:22px}.brand b{font-size:20px}.brand small{display:block;color:var(--muted);margin-top:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 8px 30px #3d30200c}.login{max-width:480px;margin:9vh auto}.title{font-size:28px;margin:0 0 8px}.muted{color:var(--muted)}label{display:block;margin:16px 0 7px;font-size:14px}input,select{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;outline:none}input:focus,select:focus{border-color:var(--gold)}
+.btn{border:0;border-radius:12px;padding:12px 18px;background:var(--accent);color:white}.btn.alt{background:#eee9df;color:var(--ink)}.btn.danger{background:#8e3d35}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.error{color:#a83b32;margin-top:12px}.success{color:var(--ok);margin-top:12px}.hidden{display:none!important}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.food{border:1px solid var(--line);border-radius:18px;padding:18px;background:white;text-align:right;transition:.15s}.food:hover{transform:translateY(-2px)}.food.selected{border:2px solid var(--accent);background:#fbf7f0}.food h3{margin:0 0 8px;font-size:16px}.food p{color:var(--muted);font-size:13px;line-height:1.7}.radio{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--accent);font-weight:bold}
+.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin:20px 0}.day{min-height:62px;border:1px solid var(--line);background:white;border-radius:13px;padding:9px;text-align:right}.day.active{outline:2px solid var(--gold)}.day.chosen{background:#f1e9dc}.dow{font-size:12px;color:var(--muted);padding:4px}.notice{background:#f2ede4;border-radius:14px;padding:13px;margin:15px 0}.headerRow{display:flex;justify-content:space-between;align-items:center;gap:15px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.stat b{font-size:26px;display:block;margin-top:6px}.tableWrap{overflow:auto;margin-top:20px}table{width:100%;border-collapse:collapse;background:white}th,td{padding:12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}th{background:#f4f0e8}
+@media(max-width:800px){.grid{grid-template-columns:1fr 1fr}.stats{grid-template-columns:1fr}.calendar{gap:5px}.day{min-height:50px;padding:7px}.shell{padding:14px}.top{align-items:flex-start}}
+@media(max-width:520px){.grid{grid-template-columns:1fr}.login{margin:4vh auto}.calendar{grid-template-columns:repeat(7,1fr);font-size:12px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const $=s=>document.querySelector(s);
+const app=$("#app");
+const state={token:localStorage.token||"",user:null,date:new Date().toISOString().slice(0,10),selected:null};
+
+async function api(url,opt={}){
+  opt.headers={...(opt.headers||{}),...(state.token?{Authorization:"Bearer "+state.token}:{})};
+  if(opt.body && typeof opt.body!=="string"){opt.headers["Content-Type"]="application/json";opt.body=JSON.stringify(opt.body)}
+  const r=await fetch(url,opt); const d=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error||"خطا");
+  return d;
+}
+function layout(content){
+ return `<div class="shell"><div class="top"><div class="brand"><div class="mark">۸</div><div><b>مطبخ چلو هشت</b><small>سامانه سفارش غذای سازمانی</small></div></div><button class="btn alt" onclick="logout()">خروج</button></div>${content}</div>`;
+}
+function login(){
+ app.innerHTML=`<div class="shell"><div class="card login">
+ <div class="brand"><div class="mark">۸</div><div><b>مطبخ چلو هشت</b><small>سامانه سفارش غذای سازمانی</small></div></div>
+ <h1 class="title" style="margin-top:28px">ورود به سامانه</h1><p class="muted">اطلاعات ورود خود را وارد کنید.</p>
+ <label>نوع کاربری</label><select id="role" onchange="toggleLogin()"><option value="employee">پرسنل</option><option value="company_admin">مدیر شرکت</option><option value="restaurant_admin">صاحب رستوران</option></select>
+ <div id="companyBox"><label>کد شرکت</label><input id="company" placeholder="مثلاً C100"></div>
+ <label id="codeLabel">کد پرسنلی</label><input id="code" placeholder="مثلاً E1001">
+ <label>رمز عبور</label><input id="pass" type="password" value="123456">
+ <div class="actions"><button class="btn" onclick="doLogin()">ورود</button></div><div id="msg"></div>
+ </div></div>`;
+}
+function toggleLogin(){
+ const r=$("#role").value, box=$("#companyBox");
+ box.classList.toggle("hidden",r==="restaurant_admin");
+ $("#codeLabel").textContent=r==="employee"?"کد پرسنلی":r==="company_admin"?"کد مدیر":"نام کاربری";
+}
+async function doLogin(){
+ try{
+  const role=$("#role").value,d=await api("/api/login",{method:"POST",body:{role,companyCode:$("#company").value,code:$("#code").value,password:$("#pass").value}});
+  state.token=d.token;state.user=d.user;localStorage.token=d.token;render();
+ }catch(e){$("#msg").innerHTML=`<div class="error">${e.message}</div>`}
+}
+function logout(){localStorage.removeItem("token");state.token="";state.user=null;login()}
+async function render(){
+ if(!state.token){login();return}
+ try{state.user=await api("/api/me")}catch{logout();return}
+ if(state.user.role==="employee") employee(); else dashboard();
+}
+function jalaliApproxLabel(iso){
+ const d=new Date(iso+"T12:00:00"); return new Intl.DateTimeFormat("fa-IR",{year:"numeric",month:"long",day:"numeric"}).format(d);
+}
+async function employee(){
+ const m=await api("/api/menu/"+state.date);
+ app.innerHTML=layout(`<div class="headerRow"><div><h1 class="title">سلام ${state.user.name} 👋</h1><p class="muted">برای هر روز فقط یک غذا انتخاب و سفارش را نهایی کنید.</p></div></div>
+ <div class="card"><div class="headerRow"><div><b>تاریخ انتخابی</b><div style="font-size:20px;margin-top:6px">${jalaliApproxLabel(state.date)}</div></div><input id="date" type="date" value="${state.date}" style="max-width:180px" onchange="state.date=this.value;employee()"></div>
+ <div class="notice">پس از ثبت نهایی، سفارش این روز قابل ویرایش یا لغو نیست.</div>
+ <div class="grid">${m.foods.map(f=>`<button class="food ${state.selected==f.id?"selected":""}" onclick="state.selected=${f.id};employee()"><h3>${f.name}</h3><p>${f.description||"غذای منتخب منوی امروز"}</p><div class="radio">${state.selected==f.id?"● انتخاب شد":"○ انتخاب غذا"}</div></button>`).join("")||"<div class='muted'>برای این تاریخ هنوز منویی ثبت نشده است.</div>"}</div>
+ <div class="actions">${m.foods.length?`<button class="btn" onclick="submitOrder()">ثبت نهایی سفارش</button>`:""}</div><div id="msg"></div></div>
+ <div class="card" style="margin-top:16px"><h2>سفارش‌های ثبت‌شده من</h2><div id="orders">در حال دریافت...</div></div>`);
+ const orders=await api("/api/my-orders");$("#orders").innerHTML=orders.length?`<div class="tableWrap"><table><tr><th>تاریخ</th><th>غذا</th><th>زمان ثبت</th></tr>${orders.map(o=>`<tr><td>${o.date}</td><td>${o.food}</td><td>${o.created_at}</td></tr>`).join("")}</table></div>`:"<p class='muted'>هنوز سفارشی ثبت نشده است.</p>";
+}
+async function submitOrder(){
+ if(!state.selected)return alert("ابتدا یک غذا انتخاب کنید.");
+ if(!confirm("سفارش شما بعد از ثبت قابل تغییر یا لغو نیست. ادامه می‌دهید؟"))return;
+ try{const d=await api("/api/orders",{method:"POST",body:{date:state.date,foodId:state.selected}});alert(d.message);state.selected=null;employee()}catch(e){alert(e.message)}
+}
+async function dashboard(){
+ const admin=state.user.role==="restaurant_admin";
+ const title=admin?"پنل صاحب رستوران":"پنل مدیر شرکت";
+ app.innerHTML=layout(`<h1 class="title">${title}</h1><p class="muted">مدیریت منو و سفارش‌ها</p>
+ <div class="stats"><div class="card stat"><span class="muted">نقش کاربری</span><b>${admin?"صاحب رستوران":"مدیر شرکت"}</b></div><div class="card stat"><span class="muted">شرکت</span><b>${admin?"همه شرکت‌ها":"شرکت شما"}</b></div><div class="card stat"><span class="muted">عملیات</span><b>مدیریت و گزارش</b></div></div>
+ ${admin?`<div class="card" style="margin-top:16px"><h2>افزودن شرکت</h2><div class="grid" style="grid-template-columns:1fr 2fr"><input id="newCode" placeholder="کد شرکت"><input id="newName" placeholder="نام شرکت"></div><div class="actions"><button class="btn" onclick="addCompany()">ثبت شرکت</button></div><div id="companies"></div></div>
+ <div class="card" style="margin-top:16px"><h2>مدیریت غذاها</h2><div class="grid" style="grid-template-columns:2fr 3fr"><input id="foodName" placeholder="نام غذا"><input id="foodDesc" placeholder="توضیح کوتاه"></div><div class="actions"><button class="btn" onclick="addFood()">افزودن غذا</button></div><div id="foods"></div></div>`:""}
+ <div class="card" style="margin-top:16px"><h2>ثبت منوی روز</h2><label>تاریخ</label><input id="menuDate" type="date" value="${state.date}">
+ ${admin?`<label>شرکت</label><select id="menuCompany"></select>`:""}
+ <label>۴ غذا را انتخاب کنید</label><div id="menuFoods" class="grid"></div><div class="actions"><button class="btn" onclick="saveMenu()">انتشار منوی ۴ غذا</button></div><div id="menuMsg"></div></div>
+ <div class="card" style="margin-top:16px"><div class="headerRow"><h2>گزارش سفارش‌ها</h2><button class="btn alt" onclick="downloadReport()">خروجی Excel/CSV</button></div><div id="report">در حال دریافت...</div></div>`);
+ if(admin){loadAdminData()} else loadCompanyFoods(); loadReport();
+}
+async function loadAdminData(){
+ const cs=await api("/api/companies");$("#companies").innerHTML="<p class='muted'>"+cs.map(c=>c.code+" — "+c.name).join(" | ")+"</p>";
+ $("#menuCompany").innerHTML=cs.map(c=>`<option value="${c.id}">${c.name} (${c.code})</option>`).join("");
+ const fs=await api("/api/foods");$("#foods").innerHTML="<p class='muted'>"+fs.map(f=>f.name).join(" • ")+"</p>"; loadMenuFoods();
+}
+async function loadCompanyFoods(){loadMenuFoods()}
+async function loadMenuFoods(){
+ const fs=await api("/api/foods"); $("#menuFoods").innerHTML=fs.map(f=>`<button id="mf${f.id}" class="food" onclick="toggleFood(${f.id})"><h3>${f.name}</h3><p>${f.description||""}</p></button>`).join("");
+}
+const chosen=new Set();
+function toggleFood(id){const e=$("#mf"+id);if(chosen.has(id)){chosen.delete(id);e.classList.remove("selected")}else if(chosen.size<4){chosen.add(id);e.classList.add("selected")}}
+async function saveMenu(){
+ if(chosen.size!==4)return $("#menuMsg").innerHTML="<div class='error'>دقیقاً ۴ غذا انتخاب کنید.</div>";
+ try{await api("/api/menus",{method:"POST",body:{companyId:state.user.role==="restaurant_admin"?+$("#menuCompany").value:state.user.companyId,date:$("#menuDate").value,foodIds:[...chosen]}});$("#menuMsg").innerHTML="<div class='success'>منوی روز با موفقیت منتشر شد.</div>";loadReport()}catch(e){$("#menuMsg").innerHTML=`<div class='error'>${e.message}</div>`}
+}
+async function addCompany(){try{await api("/api/companies",{method:"POST",body:{code:$("#newCode").value,name:$("#newName").value}});alert("شرکت ثبت شد");dashboard()}catch(e){alert(e.message)}}
+async function addFood(){try{await api("/api/foods",{method:"POST",body:{name:$("#foodName").value,description:$("#foodDesc").value}});alert("غذا اضافه شد");dashboard()}catch(e){alert(e.message)}}
+async function loadReport(){
+ const url=state.user.role==="restaurant_admin"?"/api/reports":"/api/reports";
+ const rows=await api(url);$("#report").innerHTML=rows.length?`<div class="tableWrap"><table><tr><th>تاریخ</th><th>شرکت</th><th>پرسنل</th><th>غذا</th></tr>${rows.map(r=>`<tr><td>${r.date}</td><td>${r.company}</td><td>${r.employee}</td><td>${r.food}</td></tr>`).join("")}</table></div>`:"<p class='muted'>هنوز سفارشی ثبت نشده است.</p>";
+}
+function downloadReport(){window.location="/api/reports.csv"+(state.user.role==="company_admin"?"":"")}
+render();
+</script>
+</body>
+</html>
